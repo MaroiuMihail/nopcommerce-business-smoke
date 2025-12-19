@@ -1,0 +1,11 @@
+[33mcommit 05f30419727da8065bbddb5f6cf13e4fa39f5474[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: MaroiuMihail <mihai.maroiu88@gmail.com>
+Date:   Sat Dec 20 00:33:51 2025 +0200
+
+    Add business smoke CI
+
+A	.github/workflows/smoke.yml
+A	pom.xml
+A	src/main/java/core/DriverFactory.java
+A	src/test/java/core/BaseTest.java
+A	src/test/java/tests/smoke/Smoke_SanityOpenHomeTest.java
