@@ -9,20 +9,19 @@ import org.testng.annotations.AfterMethod;
 public class BaseTest {
 
     protected WebDriver driver;
-    protected static final String BASE_URL = "https://demo.nopcommerce.com/";
+    protected static final String BASE_URL = "http://localhost:5000";
 
     @BeforeMethod
     public void setupBrowser(){
-        driver = new ChromeDriver();
+        driver = DriverFactory.createDriver();
         driver.get(BASE_URL);
-        driver.manage().window().maximize();
     }
 
     @AfterMethod
-    public void teardownBrowser() {
-        if (driver != null) {
-            driver.quit();
-        }
+   public void teardownBrowser() {
+       if (driver != null) {
+           driver.quit();
+     }
     }
 }
 
