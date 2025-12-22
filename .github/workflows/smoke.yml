@@ -24,24 +24,56 @@ jobs:
       - name: Start nopCommerce (Docker)
         run: |
           docker compose up -d
-          docker ps
+          docker compose ps
 
-      - name: Wait for nopCommerce to be ready
+      - name: Wait for nopCommerce to be ready (not install page)
         run: |
-          for i in {1..60}; do
-            if curl -fsS http://localhost:5000 >/dev/null; then
-              echo "nopCommerce is up!"
-              exit 0
+          for i in {1..90}; do
+            html="$(curl -fsS http://localhost:5000 || true)"
+            if echo "$html" | grep -qi "nopCommerce"; then
+              if echo "$html" | grep -qi "installation"; then
+                echo "Still on install page"
+              else
+                echo "nopCommerce is up (not install page)!"
+                exit 0
+              fi
             fi
             echo "Waiting for nopCommerce... ($i)"
             sleep 2
           done
-          echo "nopCommerce did not start in time"
-          docker compose logs nopcommerce
+
+          echo "nopCommerce not ready"
+          docker compose logs --no-color nopcommerce || true
+          docker compose logs --no-color sqlserver || true
           exit 1
 
       - name: Run tests (headless)
         run: mvn -Dheadless=true test
+
+      - name: Print surefire reports
+        if: failure()
+        run: |
+          echo "=== Surefire reports ==="
+          ls -la target/surefire-reports || true
+
+          echo "=== Dump *.txt (if any) ==="
+          for f in target/surefire-reports/*.txt; do
+            echo "----- $f -----"
+            cat "$f" || true
+          done
+
+          echo "=== Dump TEST-*.xml headers ==="
+          for f in target/surefire-reports/TEST-*.xml; do
+            echo "----- $f -----"
+            head -n 80 "$f" || true
+          done
+
+      - name: Docker logs (nopcommerce + sqlserver)
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --no-color nopcommerce || true
+          docker compose logs --no-color sqlserver || true
 
       - name: Shutdown docker
         if: always()
