@@ -26,26 +26,37 @@ jobs:
           docker compose up -d
           docker compose ps
 
-      - name: Wait for nopCommerce to be ready (not install page)
+      - name: Wait for nopCommerce to be ready (debug)
         run: |
           for i in {1..90}; do
-            html="$(curl -fsS http://localhost:5000 || true)"
-            if echo "$html" | grep -qi "nopCommerce"; then
-              if echo "$html" | grep -qi "installation"; then
+            code="$(curl -s -o /tmp/page.html -w "%{http_code}" http://localhost:5000 || true)"
+            echo "HTTP: $code (try $i)"
+
+            if [ "$code" = "200" ]; then
+              if grep -qi "installation" /tmp/page.html; then
                 echo "Still on install page"
               else
                 echo "nopCommerce is up (not install page)!"
                 exit 0
               fi
             fi
-            echo "Waiting for nopCommerce... ($i)"
+
             sleep 2
           done
 
-          echo "nopCommerce not ready"
+          echo "nopCommerce not ready after 180s"
+          echo "=== curl headers ==="
+          curl -i http://localhost:5000 || true
+          echo "=== first 60 lines of HTML ==="
+          head -n 60 /tmp/page.html || true
+          echo "=== docker compose ps ==="
+          docker compose ps || true
+          echo "=== nopcommerce logs ==="
           docker compose logs --no-color nopcommerce || true
-          docker compose logs --no-color sqlserver || true
+          echo "=== sqlserver logs (last 200 lines) ==="
+          docker compose logs --no-color --tail=200 sqlserver || true
           exit 1
+      
 
       - name: Run tests (headless)
         run: mvn -Dheadless=true test
