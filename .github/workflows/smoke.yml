@@ -26,29 +26,30 @@ jobs:
           docker compose up -d
           docker compose ps
 
-      - name: Wait for nopCommerce to be ready (debug)
+      - name: Wait for nopCommerce to be ready (debug, follow redirects)
         run: |
           for i in {1..90}; do
-            code="$(curl -s -o /tmp/page.html -w "%{http_code}" http://localhost:5000 || true)"
-            echo "HTTP: $code (try $i)"
-
+            code="$(curl -s -L -o /tmp/page.html -w "%{http_code}" http://localhost:5000 || true)"
+            final_url="$(curl -s -L -o /dev/null -w "%{url_effective}" http://localhost:5000 || true)"
+            echo "HTTP: $code (try $i) URL: $final_url"
+          
             if [ "$code" = "200" ]; then
-              if grep -qi "installation" /tmp/page.html; then
+              if echo "$final_url" | grep -qi "/install"; then
                 echo "Still on install page"
               else
-                echo "nopCommerce is up (not install page)!"
+                echo "nopCommerce is up!"
                 exit 0
               fi
             fi
-
+          
             sleep 2
           done
-
+          
           echo "nopCommerce not ready after 180s"
-          echo "=== curl headers ==="
-          curl -i http://localhost:5000 || true
-          echo "=== first 60 lines of HTML ==="
-          head -n 60 /tmp/page.html || true
+          echo "=== curl headers (follow redirects) ==="
+          curl -i -L http://localhost:5000 || true
+          echo "=== first 80 lines of HTML ==="
+          head -n 80 /tmp/page.html || true
           echo "=== docker compose ps ==="
           docker compose ps || true
           echo "=== nopcommerce logs ==="
