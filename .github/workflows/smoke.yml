@@ -21,5 +21,28 @@ jobs:
           java-version: "17"
           cache: maven
 
+      - name: Start nopCommerce (Docker)
+        run: |
+          docker compose up -d
+          docker ps
+
+      - name: Wait for nopCommerce to be ready
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://localhost:5000 >/dev/null; then
+              echo "nopCommerce is up!"
+              exit 0
+            fi
+            echo "Waiting for nopCommerce... ($i)"
+            sleep 2
+          done
+          echo "nopCommerce did not start in time"
+          docker compose logs nopcommerce
+          exit 1
+
       - name: Run tests (headless)
-        run: mvn -q -Dheadless=true test
+        run: mvn -Dheadless=true test
+
+      - name: Shutdown docker
+        if: always()
+        run: docker compose down -v
