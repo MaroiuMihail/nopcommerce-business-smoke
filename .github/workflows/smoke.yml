@@ -2,7 +2,7 @@ name: Business Smoke
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
   workflow_dispatch:
 
@@ -28,43 +28,62 @@ jobs:
 
       - name: Wait for SQL Server to be ready
         run: |
-          echo "Waiting for SQL Server to accept connections..."
+          echo "Waiting for SQL Server logs: 'ready for client connections'..."
           for i in {1..120}; do
-            if docker compose logs --no-color sqlserver | grep -q "SQL Server is now ready for client connections"; then
-              echo "SQL Server ready!"
+            if docker compose logs --no-color sqlserver | grep -qi "ready for client connections"; then
+              echo "SQL Server is ready!"
               exit 0
             fi
+            echo "SQL not ready yet (try $i)..."
             sleep 2
           done
+
           echo "SQL Server not ready after 240s"
-          docker compose logs --no-color --tail=200 sqlserver || true
+          docker compose ps || true
+          docker compose logs --no-color --tail=300 sqlserver || true
           exit 1
 
-      - name: Wait for nopCommerce container port to respond
+      - name: Wait for nopCommerce /install page
         run: |
-          for i in {1..90}; do
-            code="$(curl -s -L -o /tmp/page.html -w "%{http_code}" http://localhost:5000 || true)"
-            final_url="$(curl -s -L -o /dev/null -w "%{url_effective}" http://localhost:5000 || true)"
-            echo "HTTP: $code (try $i) URL: $final_url"
-
+          echo "Waiting for nopCommerce to respond on http://localhost:5000/install ..."
+          for i in {1..120}; do
+            code="$(curl -s -L -o /tmp/install.html -w "%{http_code}" http://localhost:5000/install || true)"
+            echo "HTTP: $code (try $i)"
             if [ "$code" = "200" ]; then
-              echo "nopCommerce HTTP responding."
+              echo "nopCommerce /install reachable!"
               exit 0
             fi
-
             sleep 2
           done
 
-          echo "nopCommerce not ready after 180s"
+          echo "nopCommerce not reachable after 240s"
+          echo "=== docker compose ps ==="
           docker compose ps || true
-          docker compose logs --no-color nopcommerce || true
+          echo "=== nopcommerce logs ==="
+          docker compose logs --no-color --tail=300 nopcommerce || true
+          echo "=== first 120 lines of HTML ==="
+          head -n 120 /tmp/install.html || true
           exit 1
 
-      - name: Install nopCommerce (only if needed)
+      - name: Install nopCommerce (if needed)
         run: mvn -Dtest=tests.setup.InstallNopCommerceSetup -Dheadless=true test
 
+      - name: Verify app is installed (not on /install)
+        run: |
+          final_url="$(curl -s -L -o /dev/null -w "%{url_effective}" http://localhost:5000 || true)"
+          echo "Final URL: $final_url"
+          if echo "$final_url" | grep -qi "/install"; then
+            echo "Still on /install after installer test -> FAIL"
+            echo "=== nopcommerce logs ==="
+            docker compose logs --no-color --tail=300 nopcommerce || true
+            echo "=== sqlserver logs ==="
+            docker compose logs --no-color --tail=300 sqlserver || true
+            exit 1
+          fi
+          echo "Installed OK."
+
       - name: Run smoke tests (headless)
-        run: mvn -Dheadless=true test -Dtest=tests.smoke.*
+        run: mvn -Dtest=tests.smoke.* -Dheadless=true test
 
       - name: Print surefire reports
         if: failure()
@@ -87,9 +106,9 @@ jobs:
       - name: Docker logs (nopcommerce + sqlserver)
         if: failure()
         run: |
-          docker compose ps
-          docker compose logs --no-color nopcommerce || true
-          docker compose logs --no-color --tail=200 sqlserver || true
+          docker compose ps || true
+          docker compose logs --no-color --tail=400 nopcommerce || true
+          docker compose logs --no-color --tail=400 sqlserver || true
 
       - name: Shutdown docker
         if: always()

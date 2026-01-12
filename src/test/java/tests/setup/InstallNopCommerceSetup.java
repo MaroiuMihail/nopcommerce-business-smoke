@@ -49,12 +49,13 @@ public class InstallNopCommerceSetup {
         WebDriverWait wait = new WebDriverWait(driver, LONG);
 
         try {
-            driver.get(BASE_URL);
+            driver.get(BASE_URL + "/install");
 
-            // already installed
             if (!driver.getCurrentUrl().toLowerCase().contains("/install")) {
                 return;
             }
+
+
 
             wait.until(ExpectedConditions.presenceOfElementLocated(INSTALL_BUTTON));
 
