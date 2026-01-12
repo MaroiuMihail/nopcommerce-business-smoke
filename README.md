@@ -80,16 +80,20 @@ Run headless:
 mvn -Dheadless=true test
 ```
 
-### 🧪 Project Structure
+## 🧪 Project Structure
 
-src
- ├─ main/java
- │   ├─ core        (DriverFactory, BasePage)
- │   └─ pages       (Page Objects)
- └─ test/java
-     ├─ core        (BaseTest)
-     └─ tests
-         └─ smoke   (Smoke test suite)
+```text
+src/
+├─ main/
+│  └─ java/
+│     ├─ core/        (DriverFactory, BasePage)
+│     └─ pages/       (Page Objects)
+└─ test/
+   └─ java/
+      ├─ core/        (BaseTest)
+      └─ tests/
+         └─ smoke/    (Smoke test suite)
+```
 
 ### 🎯 Project Purpose
 
