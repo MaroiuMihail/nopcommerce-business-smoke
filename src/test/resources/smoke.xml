@@ -1,0 +1,10 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="NopCommerce Smoke Suite" verbose="1" parallel="false">
+
+    <test name="Install nopCommerce">
+        <classes>
+            <class name="tests.setup.InstallNopCommerceSetup"/>
+        </classes>
+    </test>
+
+</suite>
