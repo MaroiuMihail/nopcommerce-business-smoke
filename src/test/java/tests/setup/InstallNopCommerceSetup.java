@@ -11,15 +11,16 @@ import java.util.List;
 public class InstallNopCommerceSetup {
 
     private static final String BASE_URL = "http://127.0.0.1:5000";
-    private static final Duration LONG = Duration.ofSeconds(600); // 10 min
+
+    private static final Duration LONG = Duration.ofSeconds(900); // 15 min
 
     private static final String ADMIN_EMAIL = "admin@test.com";
     private static final String ADMIN_PASS  = "Admin123!";
 
-    private static final String SQL_SERVER = "sqlserver";           // docker service name
+    private static final String SQL_SERVER = "sqlserver";
     private static final String SQL_DB     = "nopcommerce";
     private static final String SQL_USER   = "sa";
-    private static final String SQL_PASS   = "yourStrong(!)Password";
+    private static final String SQL_PASS   = "StrongPassw0rd!2026";
 
     private static final By INSTALL_BUTTON = By.cssSelector("#install-button, button#install-button, button[type='submit'], input[type='submit']");
     private static final By ERRORS = By.cssSelector(".validation-summary-errors, .field-validation-error, .message-error, .alert-danger");
@@ -28,15 +29,16 @@ public class InstallNopCommerceSetup {
     private static final By ADMIN_PASS_INPUT   = By.cssSelector("#AdminPassword, input[name='AdminPassword']");
     private static final By CONFIRM_PASS_INPUT = By.cssSelector("#ConfirmPassword, input[name='ConfirmPassword']");
 
+    private static final By DATA_PROVIDER_SELECT = By.cssSelector("#DataProvider, select[name='DataProvider']");
+    private static final By INTEGRATED_SECURITY = By.cssSelector("#IntegratedSecurity, input[name='IntegratedSecurity']");
+    private static final By CREATE_DB_IF_NOT_EXISTS = By.cssSelector("#CreateDatabaseIfNotExists, input[name='CreateDatabaseIfNotExists']");
+
     private static final By SERVER_NAME_INPUT = By.cssSelector("#ServerName, input[name='ServerName']");
     private static final By DB_NAME_INPUT     = By.cssSelector("#DatabaseName, input[name='DatabaseName']");
     private static final By USERNAME_INPUT    = By.cssSelector("#Username, input[name='Username']");
     private static final By PASSWORD_INPUT    = By.cssSelector("#Password, input[name='Password']");
 
-    private static final By INTEGRATED_SECURITY = By.cssSelector("#IntegratedSecurity, input[name='IntegratedSecurity']");
-    private static final By CREATE_DB_IF_NOT_EXISTS = By.cssSelector("#CreateDatabaseIfNotExists, input[name='CreateDatabaseIfNotExists']");
-    private static final By CONNECTION_STRING_RAW = By.cssSelector("#ConnectionStringRaw, input[name='ConnectionStringRaw']");
-    private static final By INSTALL_SAMPLE_DATA  = By.cssSelector("#InstallSampleData, input[name='InstallSampleData']");
+    private static final By INSTALL_SAMPLE_DATA = By.cssSelector("#InstallSampleData, input[name='InstallSampleData']");
 
     private static final By HOME_READY = By.id("small-searchterms");
 
@@ -48,7 +50,9 @@ public class InstallNopCommerceSetup {
         try {
             driver.get(BASE_URL + "/install");
 
-            if (!driver.getCurrentUrl().toLowerCase().contains("/install")) return;
+            if (!driver.getCurrentUrl().toLowerCase().contains("/install")) {
+                return;
+            }
 
             wait.until(ExpectedConditions.presenceOfElementLocated(INSTALL_BUTTON));
 
@@ -56,7 +60,7 @@ public class InstallNopCommerceSetup {
             typeVisible(driver, wait, ADMIN_PASS_INPUT, ADMIN_PASS);
             typeVisible(driver, wait, CONFIRM_PASS_INPUT, ADMIN_PASS);
 
-            setCheckbox(driver, CONNECTION_STRING_RAW, false);
+            selectContainsIfPresent(driver, DATA_PROVIDER_SELECT, "SQL");
 
             setCheckbox(driver, INTEGRATED_SECURITY, false);
 
@@ -70,17 +74,32 @@ public class InstallNopCommerceSetup {
             clickIfPresent(driver, INSTALL_SAMPLE_DATA);
 
             WebElement btn = wait.until(ExpectedConditions.elementToBeClickable(INSTALL_BUTTON));
+            scrollIntoView(driver, btn);
             btn.click();
 
-            boolean finished = false;
-            long end = System.currentTimeMillis() + LONG.toMillis();
 
-            while (System.currentTimeMillis() < end) {
-                String url = safeLower(driver.getCurrentUrl());
+            long deadline = System.currentTimeMillis() + LONG.toMillis();
+
+            while (System.currentTimeMillis() < deadline) {
+                sleep(2000);
+
+                String url;
+                try {
+                    url = driver.getCurrentUrl().toLowerCase();
+                } catch (Exception e) {
+                    safeRefresh(driver);
+                    continue;
+                }
 
                 if (!url.contains("/install")) {
-                    finished = true;
-                    break;
+                    if (isPresent(driver, HOME_READY)) return;
+
+                    for (int i = 0; i < 10; i++) {
+                        sleep(1000);
+                        if (isPresent(driver, HOME_READY)) return;
+                        safeRefresh(driver);
+                    }
+                    return;
                 }
 
                 String err = readErrors(driver);
@@ -88,22 +107,16 @@ public class InstallNopCommerceSetup {
                     throw new IllegalStateException("Install failed and stayed on /install. Errors: " + err);
                 }
 
-                try {
-                    Thread.sleep(2000);
-                    driver.navigate().refresh();
-                } catch (Exception ignored) {}
+                safeRefresh(driver);
             }
 
-            if (!finished) {
-                throw new IllegalStateException("Install timeout: stayed on /install with no visible errors (likely app restart loop or DB issue).");
-            }
-
-            wait.until(ExpectedConditions.presenceOfElementLocated(HOME_READY));
+            throw new IllegalStateException("Install timeout: stayed on /install with no visible errors (likely app restart loop or DB issue).");
 
         } finally {
             driver.quit();
         }
     }
+
 
     private static void typeVisible(WebDriver driver, WebDriverWait wait, By locator, String value) {
         WebElement el = wait.until(ExpectedConditions.visibilityOfElementLocated(locator));
@@ -123,7 +136,26 @@ public class InstallNopCommerceSetup {
         scrollIntoView(driver, cb);
 
         boolean checked = cb.isSelected();
-        if (checked != shouldBeChecked) cb.click();
+        if (checked != shouldBeChecked) {
+            cb.click();
+        }
+    }
+
+    private static void selectContainsIfPresent(WebDriver driver, By locator, String containsText) {
+        List<WebElement> els = driver.findElements(locator);
+        if (els.isEmpty()) return;
+
+        try {
+            Select select = new Select(els.get(0));
+            String needle = containsText.toLowerCase();
+            for (WebElement opt : select.getOptions()) {
+                String t = opt.getText() == null ? "" : opt.getText().toLowerCase();
+                if (t.contains(needle)) {
+                    select.selectByVisibleText(opt.getText());
+                    return;
+                }
+            }
+        } catch (Exception ignored) {}
     }
 
     private static void clickIfPresent(WebDriver driver, By locator) {
@@ -143,6 +175,7 @@ public class InstallNopCommerceSetup {
     private static String readErrors(WebDriver driver) {
         List<WebElement> errs = driver.findElements(ERRORS);
         if (errs.isEmpty()) return "(no visible errors)";
+
         StringBuilder sb = new StringBuilder();
         for (WebElement e : errs) {
             String t = e.getText();
@@ -157,13 +190,27 @@ public class InstallNopCommerceSetup {
         return sb.length() == 0 ? "(no visible errors)" : sb.toString();
     }
 
+    private static boolean isPresent(WebDriver driver, By locator) {
+        try {
+            return !driver.findElements(locator).isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void safeRefresh(WebDriver driver) {
+        try {
+            driver.navigate().refresh();
+        } catch (Exception ignored) {}
+    }
+
     private static void scrollIntoView(WebDriver driver, WebElement el) {
         try {
             ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block:'center'});", el);
         } catch (Exception ignored) {}
     }
 
-    private static String safeLower(String s) {
-        return s == null ? "" : s.toLowerCase();
+    private static void sleep(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException ignored) {}
     }
 }

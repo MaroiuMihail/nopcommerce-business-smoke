@@ -2,12 +2,17 @@ name: Business Smoke
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
+
+concurrency:
+  group: business-smoke-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -20,15 +25,40 @@ jobs:
           java-version: "17"
           cache: maven
 
+      - name: Show versions
+        run: |
+          java -version
+          mvn -v
+          docker version
+          docker compose version
+
       - name: Start Docker
         run: |
           docker compose up -d
           docker compose ps
 
+      # Așteptăm SQL să fie healthy (merge doar dacă ai healthcheck în docker-compose.yml)
+      - name: Wait for SQLServer healthy
+        run: |
+          echo "Waiting for SQLServer to become healthy..."
+          for i in {1..90}; do
+            STATUS=$(docker inspect --format='{{json .State.Health.Status}}' nopcommerce-business-smoke-sqlserver-1 2>/dev/null || true)
+            echo "sql health=$STATUS"
+            if [ "$STATUS" = "\"healthy\"" ]; then
+              echo "SQLServer is healthy."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "SQLServer did not become healthy in time."
+          docker compose ps
+          docker compose logs --no-color --tail=200 sqlserver || true
+          exit 1
+
       - name: Wait for nopCommerce /install
         run: |
           echo "Waiting for http://127.0.0.1:5000/install ..."
-          for i in {1..120}; do
+          for i in {1..180}; do
             code=$(curl -s -L -o /tmp/install.html -w "%{http_code}" http://127.0.0.1:5000/install || true)
             if [ "$code" = "200" ]; then
               echo "install page ready"
@@ -38,10 +68,12 @@ jobs:
           done
           echo "install page did not become ready"
           echo "--- last response head ---"
-          head -n 40 /tmp/install.html || true
+          head -n 80 /tmp/install.html || true
+          docker compose ps
+          docker compose logs --no-color --tail=200 nopcommerce || true
           exit 1
 
-      - name: Docker status
+      - name: Docker status (before install)
         run: |
           docker compose ps
           docker compose logs --no-color --tail=120 sqlserver || true
@@ -65,3 +97,8 @@ jobs:
           docker compose ps
           docker compose logs --no-color --tail=300 sqlserver || true
           docker compose logs --no-color --tail=300 nopcommerce || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v || true

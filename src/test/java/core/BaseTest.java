@@ -8,7 +8,7 @@ import org.testng.annotations.AfterMethod;
 public class BaseTest {
 
     protected WebDriver driver;
-    protected static final String BASE_URL = "http://localhost:5000";
+    protected static final String BASE_URL = "http://127.0.0.1:5000";
 
     @BeforeMethod
     public void setupBrowser(){
