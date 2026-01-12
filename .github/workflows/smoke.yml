@@ -28,25 +28,19 @@ jobs:
 
       - name: Wait for SQL Server to be ready
         run: |
+          echo "Waiting for SQL Server to accept connections..."
           for i in {1..120}; do
-            echo "SQL readiness check $i..."
-
-            # Check if SQL is listening on 1433 inside the container (no sqlcmd needed)
-            if docker compose exec -T sqlserver bash -lc "timeout 1 bash -c '</dev/tcp/localhost/1433' >/dev/null 2>&1"; then
-              echo "SQL Server port is open."
+            if docker compose logs --no-color sqlserver | grep -q "SQL Server is now ready for client connections"; then
+              echo "SQL Server ready!"
               exit 0
             fi
-
             sleep 2
           done
-
           echo "SQL Server not ready after 240s"
           docker compose logs --no-color --tail=200 sqlserver || true
           exit 1
-      
-      
 
-      - name: Wait for nopCommerce to be reachable (debug, follow redirects)
+      - name: Wait for nopCommerce container port to respond
         run: |
           for i in {1..90}; do
             code="$(curl -s -L -o /tmp/page.html -w "%{http_code}" http://localhost:5000 || true)"
@@ -54,43 +48,23 @@ jobs:
             echo "HTTP: $code (try $i) URL: $final_url"
 
             if [ "$code" = "200" ]; then
-              echo "nopCommerce is reachable (may still need install)."
+              echo "nopCommerce HTTP responding."
               exit 0
             fi
 
             sleep 2
           done
 
-          echo "nopCommerce not reachable after 180s"
-          echo "=== curl headers (follow redirects) ==="
-          curl -i -L http://localhost:5000 || true
-          echo "=== first 80 lines of HTML ==="
-          head -n 80 /tmp/page.html || true
-          echo "=== docker compose ps ==="
+          echo "nopCommerce not ready after 180s"
           docker compose ps || true
-          echo "=== nopcommerce logs ==="
           docker compose logs --no-color nopcommerce || true
-          echo "=== sqlserver logs (last 200 lines) ==="
-          docker compose logs --no-color --tail=200 sqlserver || true
           exit 1
 
-      - name: Detect install page
-        id: detect_install
-        run: |
-          final_url="$(curl -s -L -o /dev/null -w "%{url_effective}" http://localhost:5000 || true)"
-          echo "Final URL: $final_url"
-          if echo "$final_url" | grep -qi "/install"; then
-            echo "needs_install=true" >> $GITHUB_OUTPUT
-          else
-            echo "needs_install=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Install nopCommerce (only if /install)
-        if: steps.detect_install.outputs.needs_install == 'true'
+      - name: Install nopCommerce (only if needed)
         run: mvn -Dtest=tests.setup.InstallNopCommerceSetup -Dheadless=true test
 
       - name: Run smoke tests (headless)
-        run: mvn -Dheadless=true test
+        run: mvn -Dheadless=true test -Dtest=tests.smoke.*
 
       - name: Print surefire reports
         if: failure()
@@ -115,7 +89,7 @@ jobs:
         run: |
           docker compose ps
           docker compose logs --no-color nopcommerce || true
-          docker compose logs --no-color sqlserver || true
+          docker compose logs --no-color --tail=200 sqlserver || true
 
       - name: Shutdown docker
         if: always()
