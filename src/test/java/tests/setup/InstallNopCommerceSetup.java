@@ -47,13 +47,12 @@ public class InstallNopCommerceSetup {
                     By.cssSelector("input[type='password']")
             ));
 
-            typeIfPresent(driver,
-                    By.cssSelector("#AdminPassword, input[name='AdminPassword'], input[type='password'][name*='Admin'], input[type='password'][id*='Admin']"),
-                    ADMIN_PASS);
+            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("input[type='password']")));
 
-            typeIfPresent(driver,
-                    By.cssSelector("#ConfirmPassword, input[name='ConfirmPassword'], input[type='password'][name*='Confirm'], input[type='password'][id*='Confirm']"),
-                    ADMIN_PASS);
+            fillPasswordByLabel(driver, "Confirm", ADMIN_PASS);
+            fillPasswordByLabel(driver, "Password", ADMIN_PASS);
+
+
 
 
             String conn =
@@ -191,6 +190,37 @@ public class InstallNopCommerceSetup {
             }
         }
         return sb.length() == 0 ? null : sb.toString();
+    }
+
+    private static void fillPasswordByLabel(WebDriver driver, String labelContains, String value) {
+        List<WebElement> inputs = driver.findElements(By.cssSelector("input[type='password']"));
+        for (WebElement input : inputs) {
+            try {
+
+                String id = input.getAttribute("id");
+                String labelText = "";
+
+                if (id != null && !id.isBlank()) {
+                    List<WebElement> labels = driver.findElements(By.cssSelector("label[for='" + id + "']"));
+                    if (!labels.isEmpty()) labelText = labels.get(0).getText();
+                }
+
+                if (labelText == null || labelText.isBlank()) {
+                    WebElement parent = input.findElement(By.xpath("./ancestor::*[self::div or self::li][1]"));
+                    labelText = parent.getText();
+                }
+
+                if (labelText != null && labelText.toLowerCase().contains(labelContains.toLowerCase())) {
+                    input.click();
+                    input.sendKeys(org.openqa.selenium.Keys.chord(org.openqa.selenium.Keys.CONTROL, "a"));
+                    input.sendKeys(org.openqa.selenium.Keys.DELETE);
+                    input.sendKeys(value);
+                    return;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        throw new IllegalStateException("Could not find password input for label containing: " + labelContains);
     }
 
 }
