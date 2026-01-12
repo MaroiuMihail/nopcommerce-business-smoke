@@ -49,7 +49,8 @@ public class InstallNopCommerceSetup {
                             "User ID=sa;Password=yourStrong(!)Password;" +
                             "TrustServerCertificate=True;Encrypt=False";
 
-            selectByTextIfPresent(driver, By.cssSelector("#DataProvider, select[name='DataProvider']"), "SQL Server");
+            selectByContainsIfPresent(driver, By.cssSelector("#DataProvider, select[name='DataProvider']"), "sql");
+
 
 
             boolean connStringSet = typeIfPresent(driver,
@@ -73,11 +74,32 @@ public class InstallNopCommerceSetup {
             }
             installBtn.click();
 
-            wait.until(ExpectedConditions.not(
-                    ExpectedConditions.urlContains("/install")
-            ));
+            try {
+                wait.until(d -> {
+                    String url = d.getCurrentUrl().toLowerCase();
+                    if (!url.contains("/install")) return true;
+
+                    String err = getInstallErrorText(d);
+                    return err != null && !err.isBlank();
+                });
+            } catch (org.openqa.selenium.TimeoutException e) {
+                String err = getInstallErrorText(driver);
+                throw new IllegalStateException(
+                        "Install timed out and stayed on /install. Visible errors: " + (err == null ? "(none)" : err),
+                        e
+                );
+            }
+
+            if (driver.getCurrentUrl().toLowerCase().contains("/install")) {
+                String err = getInstallErrorText(driver);
+                throw new IllegalStateException(
+                        "nopCommerce install failed and stayed on /install. Visible errors: " + (err == null ? "(none)" : err)
+                );
+            }
 
             wait.until(ExpectedConditions.presenceOfElementLocated(By.id("small-searchterms")));
+
+
 
 
         } finally {
@@ -109,15 +131,22 @@ public class InstallNopCommerceSetup {
     }
 
 
-    private static void selectByTextIfPresent(WebDriver driver, By locator, String visibleText) {
+    private static void selectByContainsIfPresent(WebDriver driver, By locator, String containsText) {
         WebElement el = findFirst(driver, locator);
         if (el == null) return;
-        try {
-            new Select(el).selectByVisibleText(visibleText);
-        } catch (Exception ignored) {
 
+        Select select = new Select(el);
+        String needle = containsText.toLowerCase();
+
+        for (WebElement opt : select.getOptions()) {
+            String txt = opt.getText() == null ? "" : opt.getText().toLowerCase();
+            if (txt.contains(needle)) {
+                select.selectByVisibleText(opt.getText());
+                return;
+            }
         }
     }
+
 
     private static void clickIfPresent(WebDriver driver, By locator) {
         WebElement el = findFirst(driver, locator);
@@ -129,4 +158,27 @@ public class InstallNopCommerceSetup {
         List<WebElement> els = driver.findElements(locator);
         return els.isEmpty() ? null : els.get(0);
     }
+
+    private static String getInstallErrorText(WebDriver driver) {
+        By errorBlocks = By.cssSelector(
+                ".validation-summary-errors, .field-validation-error, .message-error, .alert-danger, #error-list"
+        );
+
+        List<WebElement> errors = driver.findElements(errorBlocks);
+        if (errors.isEmpty()) return null;
+
+        StringBuilder sb = new StringBuilder();
+        for (WebElement e : errors) {
+            String t = e.getText();
+            if (t != null) {
+                t = t.trim();
+                if (!t.isEmpty()) {
+                    if (sb.length() > 0) sb.append(" | ");
+                    sb.append(t.replace("\n", " "));
+                }
+            }
+        }
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
 }
