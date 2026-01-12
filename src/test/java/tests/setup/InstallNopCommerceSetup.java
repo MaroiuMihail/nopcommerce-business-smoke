@@ -57,37 +57,37 @@ public class InstallNopCommerceSetup {
             );
 
 
-            String conn =
-                    "Data Source=" + SQL_SERVER + ";" +
-                            "Initial Catalog=" + SQL_DB + ";" +
-                            "User ID=" + SQL_USER + ";" +
-                            "Password=" + SQL_PASS + ";" +
-                            "TrustServerCertificate=True;" +
-                            "Encrypt=False";
+            String SQL_SERVER = "sqlserver";
+            String SQL_DB = "nopcommerce";
+            String SQL_USER = "sa";
+            String SQL_PASS = "yourStrong(!)Password";
+
+
+            clickByIdOrNameContainsIfPresent(driver, "sqlauth");
+
 
             boolean connSet = typeIfPresent(driver, By.cssSelector(
-                    "#ConnectionString, input[name='ConnectionString'], input[name*='ConnectionString']"
-            ), conn);
+                            "#ConnectionString, input[name='ConnectionString'], input[id*='ConnectionString'], input[name*='ConnectionString']"
+                    ),
+                    "Data Source=sqlserver;Initial Catalog=nopcommerce;User ID=sa;Password=yourStrong(!)Password;Encrypt=False;TrustServerCertificate=True"
+            );
 
 
-            if (!connSet) {
-                typeIfPresent(driver, By.cssSelector(
-                        "#ServerName, input[name='ServerName'], input[name*='Server'], input[id*='Server'], input[name*='DataSource'], input[id*='DataSource']"
-                ), SQL_SERVER);
+            boolean serverOk = typeByIdOrNameContains(driver, "server", SQL_SERVER);
+            boolean dbOk = typeByIdOrNameContains(driver, "database", SQL_DB);
+            boolean userOk = typeByIdOrNameContains(driver, "user", SQL_USER);
+            boolean passOk = typeByIdOrNameContains(driver, "password", SQL_PASS);
 
-                typeIfPresent(driver, By.cssSelector(
-                        "#DatabaseName, input[name='DatabaseName'], input[name*='Database'], input[id*='Database']"
-                ), SQL_DB);
-
-
-                typeIfPresent(driver, By.cssSelector(
-                        "#SqlUsername, input[name='SqlUsername'], #Username, input[name='Username'], input[name*='Username'], input[id*='Username']"
-                ), SQL_USER);
-
-                typeIfPresent(driver, By.cssSelector(
-                        "#SqlPassword, input[name='SqlPassword'], #Password, input[name='Password'], input[name*='Password'], input[id*='Password']"
-                ), SQL_PASS);
+            if (!connSet && !(serverOk && userOk && passOk)) {
+                throw new IllegalStateException(
+                        "DB fields not filled: connSet=" + connSet +
+                                ", serverOk=" + serverOk +
+                                ", dbOk=" + dbOk +
+                                ", userOk=" + userOk +
+                                ", passOk=" + passOk
+                );
             }
+
 
 
             clickIfPresent(driver, By.cssSelector("#InstallSampleData, input[name='InstallSampleData']"));
@@ -260,4 +260,44 @@ public class InstallNopCommerceSetup {
     private static String safeLower(String s) {
         return s == null ? "" : s.toLowerCase();
     }
+
+    private static boolean typeByIdOrNameContains(WebDriver driver, String containsLower, String value) {
+        String key = containsLower.toLowerCase();
+        List<WebElement> inputs = driver.findElements(By.cssSelector("input"));
+
+        for (WebElement in : inputs) {
+            String id = safeLower(in.getAttribute("id"));
+            String name = safeLower(in.getAttribute("name"));
+            String type = safeLower(in.getAttribute("type"));
+
+            boolean textLike = type.isEmpty() || type.equals("text") || type.equals("tel") || type.equals("email") || type.equals("search");
+            if (!textLike) continue;
+
+            if (id.contains(key) || name.contains(key)) {
+                if (!in.isDisplayed() || !in.isEnabled()) return false;
+                setInputValue(driver, in, value);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void clickByIdOrNameContainsIfPresent(WebDriver driver, String containsLower) {
+        String key = containsLower.toLowerCase();
+        List<WebElement> els = driver.findElements(By.cssSelector("input[type='checkbox'], input[type='radio']"));
+
+        for (WebElement e : els) {
+            String id = safeLower(e.getAttribute("id"));
+            String name = safeLower(e.getAttribute("name"));
+
+            if (id.contains(key) || name.contains(key)) {
+                if (!e.isDisplayed() || !e.isEnabled()) return;
+                ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block:'center'});", e);
+                if (!e.isSelected()) e.click();
+                return;
+            }
+        }
+    }
+
+
 }
