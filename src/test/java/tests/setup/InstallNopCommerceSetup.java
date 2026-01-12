@@ -17,9 +17,10 @@ public class InstallNopCommerceSetup {
     private static final String ADMIN_PASS  = "Admin123!";
 
     private static final String SQL_SERVER = "sqlserver";
-    private static final String SQL_DB     = "nopcommerce";
     private static final String SQL_USER   = "sa";
     private static final String SQL_PASS   = "yourStrong(!)Password";
+    private static final String SQL_DB     = "nopcommerce";
+
 
     private static final By INSTALL_BUTTON = By.cssSelector("#install-button, button#install-button, button[type='submit'], input[type='submit']");
     private static final By ERRORS = By.cssSelector(".validation-summary-errors, .field-validation-error, .message-error, .alert-danger");
