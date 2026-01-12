@@ -1,10 +1,11 @@
-name: Business Smoke
+name: NopCommerce Smoke
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
-
 
 jobs:
   smoke:
@@ -18,67 +19,42 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: 17
+
+      - name: Docker version
+        run: docker --version
 
       - name: Start containers
         run: docker compose up -d
 
-      - name: Show containers
+      - name: Wait for nopCommerce /install
         run: |
-          docker compose ps
-          docker compose logs --no-color --tail=60 sqlserver || true
-          docker compose logs --no-color --tail=60 nopcommerce || true
-
-
-      - name: Wait for SQL Server
-        shell: bash
-        run: |
-          # figure out the compose default network name
-          NET="$(docker network ls --format '{{.Name}}' | grep '_default$' | head -n 1)"
-          echo "Using network: $NET"
-
+          echo "Waiting for nopCommerce installer..."
           for i in {1..60}; do
-            if docker run --rm --network "$NET" mcr.microsoft.com/azure-sql-edge:latest \
-              /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P 'yourStrong(!)Password' -Q "SELECT 1" >/dev/null 2>&1; then
-              echo "SQL Server is ready!"
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/install || true)
+            echo "Attempt $i -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "Installer is up"
               exit 0
             fi
-            echo "Waiting for SQL Server... ($i)"
-            sleep 2
+            sleep 5
           done
-
-          echo "SQL Server not ready"
-          docker compose logs --no-color --tail=200 sqlserver || true
+          echo "Installer did not come up"
           exit 1
 
 
-      - name: Wait for nopCommerce
-        shell: bash
-        run: |
-          for i in {1..120}; do
-            code="$(curl -s -L -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/install || true)"
-            if [[ "$code" != "" && "$code" -lt 500 ]]; then
-              echo "nopCommerce reachable, http_code=$code"
-              exit 0
-            fi
-            echo "Waiting for nopCommerce... ($i) code=$code"
-            sleep 2
-          done
-
-          echo "nopCommerce did not become reachable"
-          docker compose logs --no-color --tail=200 nopcommerce || true
-          exit 1
-
-      - name: Run Install Setup (headless)
-        run: mvn -Dtest=tests.setup.InstallNopCommerceSetup -Dheadless=true test
-
-      - name: Run Smoke Suite
-        run: mvn -Dheadless=true test
-
-
-      - name: Docker logs (on failure)
-        if: failure()
+      - name: Docker status (before install)
         run: |
           docker compose ps
-          docker compose logs --no-color --tail=400 nopcommerce || true
-          docker compose logs --no-color --tail=400 sqlserver || true
+          docker compose logs --no-color --tail=120 sqlserver || true
+          docker compose logs --no-color --tail=120 nopcommerce || true
+
+      - name: Run Install Smoke Test
+        run: mvn -B -Dtest=tests.setup.InstallNopCommerceSetup test
+
+      - name: Docker logs (always)
+        if: always()
+        run: |
+          docker compose ps
+          docker compose logs --no-color --tail=300 sqlserver || true
+          docker compose logs --no-color --tail=300 nopcommerce || true

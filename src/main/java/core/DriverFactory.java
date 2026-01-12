@@ -15,13 +15,12 @@ public class DriverFactory {
 
         if (Boolean.parseBoolean(System.getProperty("headless", "true"))) {
             options.addArguments("--headless=new");
+            options.addArguments("--no-sandbox");
+            options.addArguments("--disable-dev-shm-usage");
+            options.addArguments("--window-size=1920,1080");
         }
 
-        options.addArguments("--no-sandbox");
-        options.addArguments("--disable-dev-shm-usage");
-        options.addArguments("--window-size=1920,1080");
-
-        WebDriver driver = new ChromeDriver(options);
+            WebDriver driver = new ChromeDriver(options);
         return driver;
 
     }
