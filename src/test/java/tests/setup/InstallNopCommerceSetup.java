@@ -15,6 +15,7 @@ import java.util.List;
 public class InstallNopCommerceSetup {
 
     private static final String BASE_URL = "http://localhost:5000";
+    private static final String ADMIN_PASS = "Admin123!";
     private static final Duration LONG = Duration.ofSeconds(180);
 
     @Test
@@ -41,8 +42,19 @@ public class InstallNopCommerceSetup {
             }
 
             typeIfPresent(driver, By.cssSelector("#AdminEmail, input[name='AdminEmail']"), "admin@test.com");
-            typeIfPresent(driver, By.cssSelector("#AdminPassword, input[name='AdminPassword']"), "Admin123!");
-            typeIfPresent(driver, By.cssSelector("#ConfirmPassword, input[name='ConfirmPassword']"), "Admin123!");
+
+            wait.until(ExpectedConditions.presenceOfElementLocated(
+                    By.cssSelector("input[type='password']")
+            ));
+
+            typeIfPresent(driver,
+                    By.cssSelector("#AdminPassword, input[name='AdminPassword'], input[type='password'][name*='Admin'], input[type='password'][id*='Admin']"),
+                    ADMIN_PASS);
+
+            typeIfPresent(driver,
+                    By.cssSelector("#ConfirmPassword, input[name='ConfirmPassword'], input[type='password'][name*='Confirm'], input[type='password'][id*='Confirm']"),
+                    ADMIN_PASS);
+
 
             String conn =
                     "Data Source=sqlserver;Initial Catalog=nopcommerce;" +
