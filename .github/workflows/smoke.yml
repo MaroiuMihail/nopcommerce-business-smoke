@@ -26,26 +26,23 @@ jobs:
           docker compose up -d
           docker compose ps
 
-      - name: Wait for nopCommerce to be ready (debug, follow redirects)
+      # CHANGE 1: "ready" means HTTP 200 (even if /install)
+      - name: Wait for nopCommerce to be reachable (debug, follow redirects)
         run: |
           for i in {1..90}; do
             code="$(curl -s -L -o /tmp/page.html -w "%{http_code}" http://localhost:5000 || true)"
             final_url="$(curl -s -L -o /dev/null -w "%{url_effective}" http://localhost:5000 || true)"
             echo "HTTP: $code (try $i) URL: $final_url"
-          
+
             if [ "$code" = "200" ]; then
-              if echo "$final_url" | grep -qi "/install"; then
-                echo "Still on install page"
-              else
-                echo "nopCommerce is up!"
-                exit 0
-              fi
+              echo "nopCommerce is reachable (may still need install)."
+              exit 0
             fi
-          
+
             sleep 2
           done
-          
-          echo "nopCommerce not ready after 180s"
+
+          echo "nopCommerce not reachable after 180s"
           echo "=== curl headers (follow redirects) ==="
           curl -i -L http://localhost:5000 || true
           echo "=== first 80 lines of HTML ==="
@@ -57,7 +54,23 @@ jobs:
           echo "=== sqlserver logs (last 200 lines) ==="
           docker compose logs --no-color --tail=200 sqlserver || true
           exit 1
-      
+
+      # ADD 1: detect if we're on /install
+      - name: Detect install page
+        id: detect_install
+        run: |
+          final_url="$(curl -s -L -o /dev/null -w "%{url_effective}" http://localhost:5000 || true)"
+          echo "Final URL: $final_url"
+          if echo "$final_url" | grep -qi "/install"; then
+            echo "needs_install=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_install=false" >> $GITHUB_OUTPUT
+          fi
+
+      # ADD 2: run installer test only when needed
+      - name: Install nopCommerce (only if /install)
+        if: steps.detect_install.outputs.needs_install == 'true'
+        run: mvn -Dtest=tests.setup.InstallNopCommerceSetup -Dheadless=true test
 
       - name: Run tests (headless)
         run: mvn -Dheadless=true test
