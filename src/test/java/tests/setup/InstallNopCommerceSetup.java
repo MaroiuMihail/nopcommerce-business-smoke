@@ -25,6 +25,12 @@ public class InstallNopCommerceSetup {
         try {
             driver.get(BASE_URL + "/install");
 
+            wait.until(ExpectedConditions.or(
+                    ExpectedConditions.presenceOfElementLocated(By.cssSelector("#install-button, button[type='submit'], input[type='submit']")),
+                    ExpectedConditions.presenceOfElementLocated(By.cssSelector("#AdminEmail, input[name='AdminEmail']"))
+            ));
+
+
             if (!driver.getCurrentUrl().toLowerCase().contains("/install")) {
                 return;
             }
@@ -61,15 +67,12 @@ public class InstallNopCommerceSetup {
             }
             installBtn.click();
 
-            wait.until(d -> {
-                try {
-                    d.get(BASE_URL);
-                    List<WebElement> els = d.findElements(By.id("small-searchterms"));
-                    return !els.isEmpty() && els.get(0).isDisplayed();
-                } catch (Exception e) {
-                    return false;
-                }
-            });
+            wait.until(ExpectedConditions.not(
+                    ExpectedConditions.urlContains("/install")
+            ));
+
+            wait.until(ExpectedConditions.presenceOfElementLocated(By.id("small-searchterms")));
+
 
         } finally {
             driver.quit();
