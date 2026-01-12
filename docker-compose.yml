@@ -1,6 +1,7 @@
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    hostname: sqlserver
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "yourStrong(!)Password"
@@ -9,11 +10,11 @@ services:
     volumes:
       - sql_data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"yourStrong(!)Password\" -Q \"SELECT 1\" -C || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'yourStrong(!)Password' -Q \"SELECT 1\" -C || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30
-      start_period: 20s
+      start_period: 30s
 
   nopcommerce:
     image: nopcommerceteam/nopcommerce:latest
@@ -23,7 +24,7 @@ services:
     ports:
       - "5000:80"
     environment:
-      - ASPNETCORE_URLS=http://+:80
+      ASPNETCORE_URLS: "http://+:80"
     volumes:
       - nop_appdata:/app/App_Data
 

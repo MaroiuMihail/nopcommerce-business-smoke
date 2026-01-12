@@ -5,23 +5,18 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.*;
 import org.testng.annotations.Test;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 
 public class InstallNopCommerceSetup {
 
     private static final String BASE_URL = "http://127.0.0.1:5000";
-
-    private static final Duration LONG = Duration.ofMinutes(12);
+    private static final Duration LONG = Duration.ofSeconds(600); // 10 min
 
     private static final String ADMIN_EMAIL = "admin@test.com";
     private static final String ADMIN_PASS  = "Admin123!";
 
-    private static final String SQL_SERVER = "sqlserver";
+    private static final String SQL_SERVER = "sqlserver";           // docker service name
     private static final String SQL_DB     = "nopcommerce";
     private static final String SQL_USER   = "sa";
     private static final String SQL_PASS   = "yourStrong(!)Password";
@@ -40,11 +35,10 @@ public class InstallNopCommerceSetup {
 
     private static final By INTEGRATED_SECURITY = By.cssSelector("#IntegratedSecurity, input[name='IntegratedSecurity']");
     private static final By CREATE_DB_IF_NOT_EXISTS = By.cssSelector("#CreateDatabaseIfNotExists, input[name='CreateDatabaseIfNotExists']");
-
-    private static final By DATA_PROVIDER_SELECT = By.cssSelector("#DataProvider, select[name='DataProvider']");
+    private static final By CONNECTION_STRING_RAW = By.cssSelector("#ConnectionStringRaw, input[name='ConnectionStringRaw']");
     private static final By INSTALL_SAMPLE_DATA  = By.cssSelector("#InstallSampleData, input[name='InstallSampleData']");
 
-    private static final By CONNECTION_STRING_RAW = By.cssSelector("#ConnectionStringRaw, input[name='ConnectionStringRaw']");
+    private static final By HOME_READY = By.id("small-searchterms");
 
     @Test
     public void install_ifNeeded() {
@@ -54,9 +48,7 @@ public class InstallNopCommerceSetup {
         try {
             driver.get(BASE_URL + "/install");
 
-            if (!driver.getCurrentUrl().toLowerCase().contains("/install")) {
-                return;
-            }
+            if (!driver.getCurrentUrl().toLowerCase().contains("/install")) return;
 
             wait.until(ExpectedConditions.presenceOfElementLocated(INSTALL_BUTTON));
 
@@ -64,13 +56,11 @@ public class InstallNopCommerceSetup {
             typeVisible(driver, wait, ADMIN_PASS_INPUT, ADMIN_PASS);
             typeVisible(driver, wait, CONFIRM_PASS_INPUT, ADMIN_PASS);
 
-            selectIfPresent(driver, DATA_PROVIDER_SELECT, "SQL Server");
+            setCheckbox(driver, CONNECTION_STRING_RAW, false);
 
             setCheckbox(driver, INTEGRATED_SECURITY, false);
 
             setCheckbox(driver, CREATE_DB_IF_NOT_EXISTS, true);
-
-            setCheckbox(driver, CONNECTION_STRING_RAW, false);
 
             typeVisible(driver, wait, SERVER_NAME_INPUT, SQL_SERVER);
             typeVisible(driver, wait, DB_NAME_INPUT, SQL_DB);
@@ -82,32 +72,34 @@ public class InstallNopCommerceSetup {
             WebElement btn = wait.until(ExpectedConditions.elementToBeClickable(INSTALL_BUTTON));
             btn.click();
 
-            boolean finished = wait.until(d -> {
-                String url = safeLower(d.getCurrentUrl());
-                if (!url.contains("/install")) return true;
+            boolean finished = false;
+            long end = System.currentTimeMillis() + LONG.toMillis();
 
-                if (!d.findElements(ERRORS).isEmpty()) return true;
+            while (System.currentTimeMillis() < end) {
+                String url = safeLower(driver.getCurrentUrl());
 
-                return false;
-            });
-
-            if (driver.getCurrentUrl().toLowerCase().contains("/install")) {
-                String uiErrors = readErrors(driver);
-
-                if (uiErrors.contains("no visible errors")) {
-                    dumpDebug(driver, "INSTALL TIMEOUT / STUCK ON /INSTALL");
-                    throw new IllegalStateException("Install timeout: stayed on /install with no visible errors (likely app restart loop or DB issue).");
+                if (!url.contains("/install")) {
+                    finished = true;
+                    break;
                 }
 
-                throw new IllegalStateException("Install failed and stayed on /install. Errors: " + uiErrors);
+                String err = readErrors(driver);
+                if (err != null && !err.isBlank() && !err.equals("(no visible errors)")) {
+                    throw new IllegalStateException("Install failed and stayed on /install. Errors: " + err);
+                }
+
+                try {
+                    Thread.sleep(2000);
+                    driver.navigate().refresh();
+                } catch (Exception ignored) {}
             }
 
-            new WebDriverWait(driver, Duration.ofMinutes(3))
-                    .until(ExpectedConditions.presenceOfElementLocated(By.id("small-searchterms")));
+            if (!finished) {
+                throw new IllegalStateException("Install timeout: stayed on /install with no visible errors (likely app restart loop or DB issue).");
+            }
 
-        } catch (TimeoutException te) {
-            dumpDebug(driver, "TIMEOUT EXCEPTION");
-            throw te;
+            wait.until(ExpectedConditions.presenceOfElementLocated(HOME_READY));
+
         } finally {
             driver.quit();
         }
@@ -128,19 +120,10 @@ public class InstallNopCommerceSetup {
         if (els.isEmpty()) return;
 
         WebElement cb = els.get(0);
-        if (!cb.isDisplayed()) return;
-
         scrollIntoView(driver, cb);
+
         boolean checked = cb.isSelected();
         if (checked != shouldBeChecked) cb.click();
-    }
-
-    private static void selectIfPresent(WebDriver driver, By locator, String visibleText) {
-        List<WebElement> els = driver.findElements(locator);
-        if (els.isEmpty()) return;
-        try {
-            new Select(els.get(0)).selectByVisibleText(visibleText);
-        } catch (Exception ignored) {}
     }
 
     private static void clickIfPresent(WebDriver driver, By locator) {
@@ -148,7 +131,6 @@ public class InstallNopCommerceSetup {
         if (els.isEmpty()) return;
         try {
             WebElement el = els.get(0);
-            if (!el.isDisplayed()) return;
             scrollIntoView(driver, el);
             if ("checkbox".equalsIgnoreCase(el.getAttribute("type"))) {
                 if (!el.isSelected()) el.click();
@@ -183,23 +165,5 @@ public class InstallNopCommerceSetup {
 
     private static String safeLower(String s) {
         return s == null ? "" : s.toLowerCase();
-    }
-
-    private static void dumpDebug(WebDriver driver, String title) {
-        try {
-            System.out.println("=== INSTALL DEBUG DUMP [" + title + "] ===");
-            System.out.println("URL: " + driver.getCurrentUrl());
-            System.out.println("TITLE: " + driver.getTitle());
-            System.out.println("Errors: " + readErrors(driver));
-
-            String html = driver.getPageSource();
-            if (html != null) {
-                html = html.replace("\r", "");
-                System.out.println("HTML(head): " + html.substring(0, Math.min(1200, html.length())));
-            }
-            System.out.println("=== END DEBUG DUMP ===");
-        } catch (Exception e) {
-            System.out.println("DEBUG DUMP FAILED: " + e);
-        }
     }
 }
