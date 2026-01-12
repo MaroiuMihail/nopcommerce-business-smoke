@@ -59,10 +59,10 @@ public class InstallNopCommerceSetup {
 
             if (!connStringSet) {
 
-                typeIfPresent(driver, By.cssSelector("#ServerName, input[name='ServerName']"), "sqlserver");
-                typeIfPresent(driver, By.cssSelector("#DatabaseName, input[name='DatabaseName']"), "nopcommerce");
-                typeIfPresent(driver, By.cssSelector("#SqlUsername, input[name='SqlUsername']"), "sa");
-                typeIfPresent(driver, By.cssSelector("#SqlPassword, input[name='SqlPassword']"), "yourStrong(!)Password");
+                typeIfPresent(driver, By.cssSelector("#ServerName, input[name='ServerName'], input[name*='Server'], input[name*='DataSource']"), "sqlserver");
+                typeIfPresent(driver, By.cssSelector("#DatabaseName, input[name='DatabaseName'], input[name*='Database']"), "nopcommerce");
+                typeIfPresent(driver, By.cssSelector("#SqlUsername, input[name='SqlUsername'], #Username, input[name='Username'], input[name*='Username']"), "sa");
+                typeIfPresent(driver, By.cssSelector("#SqlPassword, input[name='SqlPassword'], #Password, input[name='Password'], input[name*='Password']"), "yourStrong(!)Password");
             }
 
             clickIfPresent(driver, By.cssSelector("#InstallSampleData, input[name='InstallSampleData']"));
