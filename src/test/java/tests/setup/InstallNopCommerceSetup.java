@@ -16,10 +16,11 @@ public class InstallNopCommerceSetup {
     private static final String ADMIN_EMAIL = "admin@test.com";
     private static final String ADMIN_PASS  = "Admin123!";
 
-    private static final String SQL_SERVER = "sqlserver";
-    private static final String SQL_DB     = "nopcommerce";
+    private static final String SQL_SERVER = "sqlserver,1433";
+    private static final String SQL_DB     = "nopCommerce";
     private static final String SQL_USER   = "sa";
     private static final String SQL_PASS   = "yourStrong(!)Password";
+
 
     @Test
     public void install_ifNeeded() {
@@ -50,17 +51,8 @@ public class InstallNopCommerceSetup {
                     "sql"
             );
 
-            String conn =
-                    "Data Source=" + SQL_SERVER + ";" +
-                            "Initial Catalog=" + SQL_DB + ";" +
-                            "User ID=" + SQL_USER + ";" +
-                            "Password=" + SQL_PASS + ";" +
-                            "Encrypt=False;" +
-                            "TrustServerCertificate=True;";
+            boolean connSet = false;
 
-            boolean connSet = typeIfPresent(driver, By.cssSelector(
-                    "#ConnectionString, input[name='ConnectionString'], input[id*='ConnectionString'], input[name*='ConnectionString']"
-            ), conn);
 
             boolean serverOk =
                     typeByIdOrNameContains(driver, "servername", SQL_SERVER) ||
@@ -88,7 +80,7 @@ public class InstallNopCommerceSetup {
                 sqlPassSet = true;
             }
 
-            if (!connSet && !(serverOk && userOk && sqlPassSet)) {
+            if (!connSet && !(serverOk && dbOk && userOk && sqlPassSet)) {
                 throw new IllegalStateException(
                         "DB fields not filled. connSet=" + connSet +
                                 ", serverOk=" + serverOk +
@@ -215,8 +207,10 @@ public class InstallNopCommerceSetup {
             String name = safeLower(in.getAttribute("name"));
             String type = safeLower(in.getAttribute("type"));
 
-            boolean textLike = type.isEmpty() || type.equals("text") || type.equals("tel") || type.equals("email") || type.equals("search");
-            if (!textLike) continue;
+            boolean skip = type.equals("hidden") || type.equals("checkbox") || type.equals("radio")
+                    || type.equals("submit") || type.equals("button");
+            if (skip) continue;
+
 
             if (id.contains(key) || name.contains(key)) {
                 if (!in.isDisplayed() || !in.isEnabled()) return false;
