@@ -6,6 +6,8 @@ services:
       - MSSQL_SA_PASSWORD=yourStrong(!)Password
     ports:
       - "1433:1433"
+    volumes:
+      - sql_data:/var/opt/mssql
 
   nopcommerce:
     image: nopcommerceteam/nopcommerce:latest
@@ -15,3 +17,9 @@ services:
       - "5000:80"
     environment:
       - ASPNETCORE_URLS=http://+:80
+    volumes:
+      - nop_appdata:/app/App_Data
+
+volumes:
+  sql_data:
+  nop_appdata:

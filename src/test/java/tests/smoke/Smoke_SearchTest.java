@@ -1,45 +1,39 @@
 package tests.smoke;
 
 import core.BaseTest;
-import org.openqa.selenium.By;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import pages.CartPage;
 import pages.HomePage;
-import java.time.Duration;
-import java.util.List;
+import pages.ProductDetailsPage;
+import pages.SearchResultsPage;
 
 public class Smoke_SearchTest extends BaseTest {
 
-    private static final By SEARCH_RESULTS =
-            By.cssSelector(".product-title a");
-
-    private static final By ADD_TO_CART_BUTTON =
-            By.cssSelector("button[id^='add-to-cart-button']");
 
     @Test
     public void search_shouldWork() {
 
         HomePage homePage = new HomePage(driver);
+        SearchResultsPage searchResultsPage = new SearchResultsPage(driver);
+
         homePage.searchFor("laptop");
 
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        int count = searchResultsPage.getResultsCount();
+        Assert.assertTrue(count > 0, "No search results found. Count=" + count);
 
-        wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(SEARCH_RESULTS));
+        searchResultsPage.openFirstResult();
 
+        ProductDetailsPage productDetailsPage = new ProductDetailsPage(driver);
 
-        List<WebElement> results = driver.findElements(SEARCH_RESULTS);
-        Assert.assertTrue(results.size() > 0,
-                "No search results found");
+        Assert.assertTrue(productDetailsPage.isAddToCartVisible(), "PDP not opened");
 
-        wait.until(ExpectedConditions.elementToBeClickable(SEARCH_RESULTS));
-        driver.findElements(SEARCH_RESULTS).get(0).click();
+        productDetailsPage.addToCart();
 
+        CartPage cartPage = productDetailsPage.openCartFromSuccessBar();
+        Assert.assertTrue(cartPage.isLoaded(), "Cart page not loaded");
+        Assert.assertTrue(cartPage.getItemCount() > 0, "Cart is empty after adding product");
 
-        WebElement addToCart = wait.until(ExpectedConditions.elementToBeClickable(ADD_TO_CART_BUTTON));
-        Assert.assertTrue(addToCart.isDisplayed(), "PDP not opened");
 
     }
 
