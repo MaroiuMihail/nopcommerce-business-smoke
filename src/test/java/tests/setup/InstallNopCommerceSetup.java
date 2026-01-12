@@ -49,8 +49,14 @@ public class InstallNopCommerceSetup {
 
             wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("input[type='password']")));
 
-            fillPasswordByLabel(driver, "Confirm", ADMIN_PASS);
-            fillPasswordByLabel(driver, "Password", ADMIN_PASS);
+            wait.until(ExpectedConditions.numberOfElementsToBeMoreThan(By.cssSelector("input[type='password']"), 1));
+
+            List<WebElement> pw = driver.findElements(By.cssSelector("input[type='password']"));
+
+// 0 = Admin Password, 1 = Confirm Password (în installer)
+            setInputValue(driver, pw.get(0), ADMIN_PASS);
+            setInputValue(driver, pw.get(1), ADMIN_PASS);
+
 
 
 
@@ -222,5 +228,16 @@ public class InstallNopCommerceSetup {
         }
         throw new IllegalStateException("Could not find password input for label containing: " + labelContains);
     }
+
+    private static void setInputValue(WebDriver driver, WebElement el, String value) {
+        ((org.openqa.selenium.JavascriptExecutor) driver)
+                .executeScript("arguments[0].scrollIntoView({block:'center'});", el);
+
+        el.click();
+        el.sendKeys(org.openqa.selenium.Keys.chord(org.openqa.selenium.Keys.CONTROL, "a"));
+        el.sendKeys(org.openqa.selenium.Keys.DELETE);
+        el.sendKeys(value);
+    }
+
 
 }
