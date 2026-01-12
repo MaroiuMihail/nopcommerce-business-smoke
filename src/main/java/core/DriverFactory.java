@@ -12,18 +12,18 @@ public class DriverFactory {
         WebDriverManager.chromedriver().setup();
 
         ChromeOptions options = new ChromeOptions();
-        options.addArguments("--window-size=1920,1080");
 
-        boolean headlessProp = "true".equalsIgnoreCase(System.getProperty("headless"));
-        boolean ciEnv = "true".equalsIgnoreCase(System.getenv("CI"));
-        if (headlessProp || ciEnv) {
+        if (Boolean.parseBoolean(System.getProperty("headless", "true"))) {
             options.addArguments("--headless=new");
-            options.addArguments("--no-sandbox");
-            options.addArguments("--disable-dev-shm-usage");
-            options.addArguments("--disable-gpu");
         }
 
-        return new ChromeDriver(options);
+        options.addArguments("--no-sandbox");
+        options.addArguments("--disable-dev-shm-usage");
+        options.addArguments("--window-size=1920,1080");
+
+        WebDriver driver = new ChromeDriver(options);
+        return driver;
+
     }
 
 }
