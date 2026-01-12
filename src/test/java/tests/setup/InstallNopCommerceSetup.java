@@ -3,7 +3,6 @@ package tests.setup;
 import core.DriverFactory;
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.*;
-
 import org.testng.annotations.Test;
 
 import java.time.Duration;
@@ -14,14 +13,13 @@ public class InstallNopCommerceSetup {
     private static final String BASE_URL = "http://localhost:5000";
     private static final Duration LONG = Duration.ofSeconds(180);
 
-
     private static final String ADMIN_EMAIL = "admin@test.com";
     private static final String ADMIN_PASS  = "Admin123!";
 
-    private static final String SQL_USER = "sa";
-    private static final String SQL_PASS = "yourStrong(!)Password";
     private static final String SQL_SERVER = "sqlserver";
-    private static final String SQL_DB = "nopcommerce";
+    private static final String SQL_DB     = "nopcommerce";
+    private static final String SQL_USER   = "sa";
+    private static final String SQL_PASS   = "yourStrong(!)Password";
 
     @Test
     public void install_ifNeeded() {
@@ -31,71 +29,78 @@ public class InstallNopCommerceSetup {
         try {
             driver.get(BASE_URL + "/install");
 
-
             if (!driver.getCurrentUrl().toLowerCase().contains("/install")) {
                 return;
             }
 
-
             wait.until(ExpectedConditions.presenceOfElementLocated(
-                    By.cssSelector("#install-button, button[type='submit'], input[type='submit']")
+                    By.cssSelector("#install-button, button#install-button, button[type='submit'], input[type='submit']")
             ));
 
-
+            // --- Admin Email ---
             typeIfPresent(driver, By.cssSelector(
-                    "#AdminEmail, input[name='AdminEmail'], input[name*='AdminEmail']"
+                    "#AdminEmail, input[name='AdminEmail'], input[name*='AdminEmail'], input[id*='AdminEmail']"
             ), ADMIN_EMAIL);
-
 
             setPasswordField(driver, "adminpassword", ADMIN_PASS);
             setPasswordField(driver, "confirmpassword", ADMIN_PASS);
 
-
             selectByContainsIfPresent(driver,
-                    By.cssSelector("#DataProvider, select[name='DataProvider'], select[name*='DataProvider']"),
+                    By.cssSelector("#DataProvider, select[name='DataProvider'], select[name*='DataProvider'], select[id*='DataProvider']"),
                     "sql"
             );
 
-
-            String SQL_SERVER = "sqlserver";
-            String SQL_DB = "nopcommerce";
-            String SQL_USER = "sa";
-            String SQL_PASS = "yourStrong(!)Password";
-
-
-            clickByIdOrNameContainsIfPresent(driver, "sqlauth");
-
+            String conn =
+                    "Data Source=" + SQL_SERVER + ";" +
+                            "Initial Catalog=" + SQL_DB + ";" +
+                            "User ID=" + SQL_USER + ";" +
+                            "Password=" + SQL_PASS + ";" +
+                            "Encrypt=False;" +
+                            "TrustServerCertificate=True;";
 
             boolean connSet = typeIfPresent(driver, By.cssSelector(
-                            "#ConnectionString, input[name='ConnectionString'], input[id*='ConnectionString'], input[name*='ConnectionString']"
-                    ),
-                    "Data Source=sqlserver;Initial Catalog=nopcommerce;User ID=sa;Password=yourStrong(!)Password;Encrypt=False;TrustServerCertificate=True"
-            );
+                    "#ConnectionString, input[name='ConnectionString'], input[id*='ConnectionString'], input[name*='ConnectionString']"
+            ), conn);
 
+            boolean serverOk =
+                    typeByIdOrNameContains(driver, "servername", SQL_SERVER) ||
+                            typeByIdOrNameContains(driver, "server", SQL_SERVER) ||
+                            typeByIdOrNameContains(driver, "datasource", SQL_SERVER);
 
-            boolean serverOk = typeByIdOrNameContains(driver, "server", SQL_SERVER);
-            boolean dbOk = typeByIdOrNameContains(driver, "database", SQL_DB);
-            boolean userOk = typeByIdOrNameContains(driver, "user", SQL_USER);
-            boolean passOk =
-                    typePasswordByIdOrNameContains(driver, "sqlpassword", SQL_PASS)
-                            || typePasswordByIdOrNameContains(driver, "dbpassword", SQL_PASS)
-                            || typePasswordByIdOrNameContains(driver, "password", SQL_PASS);
+            boolean dbOk =
+                    typeByIdOrNameContains(driver, "databasename", SQL_DB) ||
+                            typeByIdOrNameContains(driver, "database", SQL_DB) ||
+                            typeByIdOrNameContains(driver, "initialcatalog", SQL_DB);
 
+            boolean userOk =
+                    typeByIdOrNameContains(driver, "sqlusername", SQL_USER) ||
+                            typeByIdOrNameContains(driver, "username", SQL_USER) ||
+                            typeByIdOrNameContains(driver, "userid", SQL_USER) ||
+                            typeByIdOrNameContains(driver, "user", SQL_USER);
 
-            if (!connSet && !(serverOk && userOk && passOk)) {
+            boolean sqlPassSet =
+                    typePasswordByIdOrNameContains(driver, "sqlpassword", SQL_PASS) ||
+                            typePasswordByIdOrNameContains(driver, "dbpassword", SQL_PASS) ||
+                            typePasswordByIdOrNameContains(driver, "mssqlpassword", SQL_PASS);
+
+            if (!sqlPassSet) {
+                fillRemainingDbPassword(driver, SQL_PASS);
+                sqlPassSet = true;
+            }
+
+            if (!connSet && !(serverOk && userOk && sqlPassSet)) {
                 throw new IllegalStateException(
-                        "DB fields not filled: connSet=" + connSet +
+                        "DB fields not filled. connSet=" + connSet +
                                 ", serverOk=" + serverOk +
                                 ", dbOk=" + dbOk +
                                 ", userOk=" + userOk +
-                                ", passOk=" + passOk
+                                ", sqlPassSet=" + sqlPassSet
                 );
             }
 
+            clickIfPresent(driver, By.cssSelector("#InstallSampleData, input[name='InstallSampleData'], input[id*='InstallSampleData']"));
 
-
-            clickIfPresent(driver, By.cssSelector("#InstallSampleData, input[name='InstallSampleData']"));
-
+            dumpPasswordInputs(driver);
 
             WebElement installBtn = firstOrNull(driver,
                     By.cssSelector("#install-button, button#install-button, button[type='submit'], input[type='submit']")
@@ -103,9 +108,7 @@ public class InstallNopCommerceSetup {
             if (installBtn == null) {
                 throw new IllegalStateException("Install button not found on /install page");
             }
-
             safeClick(driver, installBtn);
-
 
             try {
                 wait.until(d -> {
@@ -130,15 +133,12 @@ public class InstallNopCommerceSetup {
                 );
             }
 
-
             wait.until(ExpectedConditions.presenceOfElementLocated(By.id("small-searchterms")));
 
         } finally {
             driver.quit();
         }
     }
-
-
 
     private static void setPasswordField(WebDriver driver, String keyLower, String value) {
         List<WebElement> inputs = driver.findElements(By.cssSelector("input[type='password']"));
@@ -148,11 +148,13 @@ public class InstallNopCommerceSetup {
             String name = safeLower(input.getAttribute("name"));
 
             if (id.contains(keyLower) || name.contains(keyLower)) {
+                if (!input.isDisplayed() || !input.isEnabled()) {
+                    throw new IllegalStateException("Password field found but not interactable: " + keyLower);
+                }
                 setInputValue(driver, input, value);
                 return;
             }
         }
-
 
         StringBuilder dbg = new StringBuilder();
         for (int i = 0; i < inputs.size(); i++) {
@@ -162,13 +164,67 @@ public class InstallNopCommerceSetup {
         throw new IllegalStateException("Could not find password field matching: " + keyLower + ". Found: " + dbg);
     }
 
-    private static void setInputValue(WebDriver driver, WebElement el, String value) {
-        ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block:'center'});", el);
-        waitClickable(driver, el).click();
+    private static boolean typePasswordByIdOrNameContains(WebDriver driver, String containsLower, String value) {
+        String key = containsLower.toLowerCase();
+        List<WebElement> inputs = driver.findElements(By.cssSelector("input[type='password']"));
 
-        el.sendKeys(Keys.chord(Keys.CONTROL, "a"));
-        el.sendKeys(Keys.DELETE);
-        el.sendKeys(value);
+        for (WebElement in : inputs) {
+            String id = safeLower(in.getAttribute("id"));
+            String name = safeLower(in.getAttribute("name"));
+
+            if (id.contains(key) || name.contains(key)) {
+                if (!in.isDisplayed() || !in.isEnabled()) return false;
+                setInputValue(driver, in, value);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void fillRemainingDbPassword(WebDriver driver, String value) {
+        List<WebElement> pw = driver.findElements(By.cssSelector("input[type='password']"));
+
+        WebElement candidate = null;
+
+        for (WebElement in : pw) {
+            String id = safeLower(in.getAttribute("id"));
+            String name = safeLower(in.getAttribute("name"));
+
+            boolean isAdmin = id.contains("adminpassword") || name.contains("adminpassword");
+            boolean isConfirm = id.contains("confirmpassword") || name.contains("confirmpassword");
+
+            if (isAdmin || isConfirm) continue;
+
+            candidate = in;
+            break;
+        }
+
+        if (candidate == null) {
+            throw new IllegalStateException("Could not find a non-admin password field to treat as SQL password.");
+        }
+
+        setInputValue(driver, candidate, value);
+    }
+
+    private static boolean typeByIdOrNameContains(WebDriver driver, String containsLower, String value) {
+        String key = containsLower.toLowerCase();
+        List<WebElement> inputs = driver.findElements(By.cssSelector("input"));
+
+        for (WebElement in : inputs) {
+            String id = safeLower(in.getAttribute("id"));
+            String name = safeLower(in.getAttribute("name"));
+            String type = safeLower(in.getAttribute("type"));
+
+            boolean textLike = type.isEmpty() || type.equals("text") || type.equals("tel") || type.equals("email") || type.equals("search");
+            if (!textLike) continue;
+
+            if (id.contains(key) || name.contains(key)) {
+                if (!in.isDisplayed() || !in.isEnabled()) return false;
+                setInputValue(driver, in, value);
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean typeIfPresent(WebDriver driver, By locator, String text) {
@@ -181,7 +237,6 @@ public class InstallNopCommerceSetup {
             ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block:'center'});", el);
             waitClickable(driver, el).click();
 
-
             el.sendKeys(Keys.chord(Keys.CONTROL, "a"));
             el.sendKeys(Keys.DELETE);
             el.sendKeys(text);
@@ -190,6 +245,15 @@ public class InstallNopCommerceSetup {
         } catch (ElementNotInteractableException e) {
             return false;
         }
+    }
+
+    private static void setInputValue(WebDriver driver, WebElement el, String value) {
+        ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block:'center'});", el);
+        waitClickable(driver, el).click();
+
+        el.sendKeys(Keys.chord(Keys.CONTROL, "a"));
+        el.sendKeys(Keys.DELETE);
+        el.sendKeys(value);
     }
 
     private static void selectByContainsIfPresent(WebDriver driver, By locator, String containsText) {
@@ -261,65 +325,20 @@ public class InstallNopCommerceSetup {
         return sb.length() == 0 ? null : sb.toString();
     }
 
+    private static void dumpPasswordInputs(WebDriver driver) {
+        List<WebElement> pw = driver.findElements(By.cssSelector("input[type='password']"));
+        System.out.println("=== PASSWORD INPUTS DUMP (" + pw.size() + ") ===");
+        for (int i = 0; i < pw.size(); i++) {
+            WebElement e = pw.get(i);
+            String id = e.getAttribute("id");
+            String name = e.getAttribute("name");
+            String val = e.getAttribute("value");
+            int len = (val == null) ? 0 : val.length();
+            System.out.println("PW[" + i + "] id=" + id + " name=" + name + " valueLen=" + len);
+        }
+    }
+
     private static String safeLower(String s) {
         return s == null ? "" : s.toLowerCase();
     }
-
-    private static boolean typeByIdOrNameContains(WebDriver driver, String containsLower, String value) {
-        String key = containsLower.toLowerCase();
-        List<WebElement> inputs = driver.findElements(By.cssSelector("input"));
-
-        for (WebElement in : inputs) {
-            String id = safeLower(in.getAttribute("id"));
-            String name = safeLower(in.getAttribute("name"));
-            String type = safeLower(in.getAttribute("type"));
-
-            boolean textLike = type.isEmpty() || type.equals("text") || type.equals("tel") || type.equals("email") || type.equals("search");
-            if (!textLike) continue;
-
-            if (id.contains(key) || name.contains(key)) {
-                if (!in.isDisplayed() || !in.isEnabled()) return false;
-                setInputValue(driver, in, value);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static void clickByIdOrNameContainsIfPresent(WebDriver driver, String containsLower) {
-        String key = containsLower.toLowerCase();
-        List<WebElement> els = driver.findElements(By.cssSelector("input[type='checkbox'], input[type='radio']"));
-
-        for (WebElement e : els) {
-            String id = safeLower(e.getAttribute("id"));
-            String name = safeLower(e.getAttribute("name"));
-
-            if (id.contains(key) || name.contains(key)) {
-                if (!e.isDisplayed() || !e.isEnabled()) return;
-                ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block:'center'});", e);
-                if (!e.isSelected()) e.click();
-                return;
-            }
-        }
-    }
-
-    private static boolean typePasswordByIdOrNameContains(WebDriver driver, String containsLower, String value) {
-        String key = containsLower.toLowerCase();
-        List<WebElement> inputs = driver.findElements(By.cssSelector("input[type='password']"));
-
-        for (WebElement in : inputs) {
-            String id = safeLower(in.getAttribute("id"));
-            String name = safeLower(in.getAttribute("name"));
-
-            if (id.contains(key) || name.contains(key)) {
-                if (!in.isDisplayed() || !in.isEnabled()) return false;
-                setInputValue(driver, in, value);
-                return true;
-            }
-        }
-        return false;
-    }
-
-
-
 }
