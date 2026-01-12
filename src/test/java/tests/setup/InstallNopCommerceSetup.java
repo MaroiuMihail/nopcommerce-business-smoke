@@ -76,7 +76,11 @@ public class InstallNopCommerceSetup {
             boolean serverOk = typeByIdOrNameContains(driver, "server", SQL_SERVER);
             boolean dbOk = typeByIdOrNameContains(driver, "database", SQL_DB);
             boolean userOk = typeByIdOrNameContains(driver, "user", SQL_USER);
-            boolean passOk = typeByIdOrNameContains(driver, "password", SQL_PASS);
+            boolean passOk =
+                    typePasswordByIdOrNameContains(driver, "sqlpassword", SQL_PASS)
+                            || typePasswordByIdOrNameContains(driver, "dbpassword", SQL_PASS)
+                            || typePasswordByIdOrNameContains(driver, "password", SQL_PASS);
+
 
             if (!connSet && !(serverOk && userOk && passOk)) {
                 throw new IllegalStateException(
@@ -298,6 +302,24 @@ public class InstallNopCommerceSetup {
             }
         }
     }
+
+    private static boolean typePasswordByIdOrNameContains(WebDriver driver, String containsLower, String value) {
+        String key = containsLower.toLowerCase();
+        List<WebElement> inputs = driver.findElements(By.cssSelector("input[type='password']"));
+
+        for (WebElement in : inputs) {
+            String id = safeLower(in.getAttribute("id"));
+            String name = safeLower(in.getAttribute("name"));
+
+            if (id.contains(key) || name.contains(key)) {
+                if (!in.isDisplayed() || !in.isEnabled()) return false;
+                setInputValue(driver, in, value);
+                return true;
+            }
+        }
+        return false;
+    }
+
 
 
 }
