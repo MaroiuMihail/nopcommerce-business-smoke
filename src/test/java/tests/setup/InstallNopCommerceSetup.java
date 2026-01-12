@@ -25,6 +25,11 @@ public class InstallNopCommerceSetup {
         try {
             driver.get(BASE_URL + "/install");
 
+            wait.until(ExpectedConditions.presenceOfElementLocated(
+                    By.cssSelector("#install-button, button[type='submit'], input[type='submit']")
+            ));
+
+
             wait.until(ExpectedConditions.or(
                     ExpectedConditions.presenceOfElementLocated(By.cssSelector("#install-button, button[type='submit'], input[type='submit']")),
                     ExpectedConditions.presenceOfElementLocated(By.cssSelector("#AdminEmail, input[name='AdminEmail']"))
@@ -44,6 +49,9 @@ public class InstallNopCommerceSetup {
                             "User ID=sa;Password=yourStrong(!)Password;" +
                             "TrustServerCertificate=True;Encrypt=False";
 
+            selectByTextIfPresent(driver, By.cssSelector("#DataProvider, select[name='DataProvider']"), "SQL Server");
+
+
             boolean connStringSet = typeIfPresent(driver,
                     By.cssSelector("#ConnectionString, input[name='ConnectionString']"),
                     conn);
@@ -55,8 +63,6 @@ public class InstallNopCommerceSetup {
                 typeIfPresent(driver, By.cssSelector("#SqlUsername, input[name='SqlUsername']"), "sa");
                 typeIfPresent(driver, By.cssSelector("#SqlPassword, input[name='SqlPassword']"), "yourStrong(!)Password");
             }
-
-            selectByTextIfPresent(driver, By.cssSelector("#DataProvider, select[name='DataProvider']"), "SQL Server");
 
             clickIfPresent(driver, By.cssSelector("#InstallSampleData, input[name='InstallSampleData']"));
 
@@ -82,10 +88,26 @@ public class InstallNopCommerceSetup {
     private static boolean typeIfPresent(WebDriver driver, By locator, String text) {
         WebElement el = findFirst(driver, locator);
         if (el == null) return false;
-        el.clear();
-        el.sendKeys(text);
-        return true;
+
+        try {
+            if (!el.isDisplayed() || !el.isEnabled()) return false;
+
+            ((org.openqa.selenium.JavascriptExecutor) driver)
+                    .executeScript("arguments[0].scrollIntoView({block:'center'});", el);
+
+            el.click();
+
+            el.sendKeys(org.openqa.selenium.Keys.chord(org.openqa.selenium.Keys.CONTROL, "a"));
+            el.sendKeys(org.openqa.selenium.Keys.DELETE);
+
+            el.sendKeys(text);
+            return true;
+
+        } catch (org.openqa.selenium.ElementNotInteractableException e) {
+            return false;
+        }
     }
+
 
     private static void selectByTextIfPresent(WebDriver driver, By locator, String visibleText) {
         WebElement el = findFirst(driver, locator);
