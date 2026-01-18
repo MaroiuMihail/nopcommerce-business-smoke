@@ -23,6 +23,4 @@ jobs:
 
       - name: Build (no tests)
         run: ./mvnw -DskipTests package
-  git add .github/workflows/ci.yml
-  git commit -m "Add minimal CI build-only"
-  git push
+
