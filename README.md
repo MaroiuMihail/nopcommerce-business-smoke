@@ -1,11 +1,15 @@
+![Build](https://github.com/MaroiuMihail/nopcommerce-business-smoke/actions/workflows/ci.yml/badge.svg)
+
 # nopcommerce-business-smoke
 
 UI smoke tests (Java + Selenium + TestNG) for nopCommerce running locally via Docker Compose.
 
+CI is build-only. UI tests are intended to be executed locally.
+
 ## Prerequisites
 - JDK 17
 - Docker + Docker Compose
-- Google Chrome
+- Google Chrome (local)
 
 ## Run app locally
 ```bash
