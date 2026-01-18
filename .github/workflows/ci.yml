@@ -18,9 +18,5 @@ jobs:
           java-version: "17"
           cache: maven
 
-      - name: Make mvnw executable
-        run: chmod +x mvnw
-
       - name: Build (no tests)
-        run: ./mvnw -DskipTests package
-
+        run: mvn -DskipTests package
